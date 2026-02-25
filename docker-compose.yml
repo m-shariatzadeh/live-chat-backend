@@ -93,6 +93,21 @@ services:
     networks:
       - livechat
 
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: livechat_phpmyadmin
+    restart: unless-stopped
+    depends_on:
+      - mysql
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      PMA_USER: root
+      PMA_PASSWORD: root
+    ports:
+      - "8080:80"
+    networks:
+      - livechat
 networks:
   livechat:
 
