@@ -15,8 +15,7 @@ class MessageService
         string $body
     ): Message {
 
-        return DB::transaction(function () use ($conversation, $visitorId, $body) {
-
+        $message = DB::transaction(function () use ($conversation, $visitorId, $body) {
             $message = Message::create([
                 'conversation_id' => $conversation->id,
                 'sender_type'     => 'visitor',
@@ -26,9 +25,11 @@ class MessageService
             ]);
 
             $this->updateConversationMeta($conversation, $message);
-            broadcast(new MessageSent($message))->toOthers();
             return $message;
         });
+
+        broadcast(new MessageSent($message))->toOthers();
+        return $message;
     }
 
     public function sendAgentMessage(
@@ -37,7 +38,7 @@ class MessageService
         string $body
     ): Message {
 
-        return DB::transaction(function () use ($conversation, $agentId, $body) {
+        $message = DB::transaction(function () use ($conversation, $agentId, $body) {
 
             $message = Message::create([
                 'conversation_id' => $conversation->id,
@@ -57,9 +58,11 @@ class MessageService
             }
 
             $this->updateConversationMeta($conversation, $message);
-            broadcast(new MessageSent($message))->toOthers();
             return $message;
+
         });
+        broadcast(new MessageSent($message))->toOthers();
+        return $message;
     }
 
     private function updateConversationMeta(

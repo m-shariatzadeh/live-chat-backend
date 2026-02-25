@@ -39,11 +39,11 @@ class MessageController extends Controller
     {
       $visitorId = (int) $request->attributes->get('visitor_id');
 
-$message = $this->service->sendVisitorMessage(
-    $conversation,
-    $visitorId,
-    $request->body
-);
+        $message = $this->service->sendVisitorMessage(
+            $conversation,
+            $visitorId,
+            $request->body
+        );
 
         return response()->json($message);
     }
