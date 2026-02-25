@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Visitor Chat</title>
+  <script src="https://js.pusher.com/8.4.0/pusher.min.js"></script>
+  <style>
+    body { font-family: sans-serif; }
+    #messages { border:1px solid #ccc; padding:10px; height:320px; overflow:auto; margin:10px 0; }
+    input { padding:8px; }
+    button { padding:8px 12px; cursor:pointer; }
+    .muted { color:#666; font-size:12px; }
+  </style>
+</head>
+<body>
+  <h2>Visitor</h2>
+
+  <div class="muted" id="meta">Loading...</div>
+  <button onclick="resetAll()">Reset (New Session)</button>
+
+  <div id="messages"></div>
+
+  <input id="messageInput" placeholder="Type message..." style="width:70%;" />
+  <button onclick="sendMessage()">Send</button>
+
+  <script>
+    // ==== تنظیمات شما ====
+    const API_BASE = "http://localhost:8000";  // Laravel/Nginx
+    const PUSHER_KEY = "appkey";               // PUSHER_APP_KEY
+    const PUSHER_CLUSTER = "mt1";              // PUSHER_APP_CLUSTER
+    const WS_HOST = "localhost";
+    const WS_PORT = 6001;
+
+    let state = {
+      visitor_id: null,
+      session_id: null,
+      session_token: null,
+      conversation_id: null
+    };
+
+    let pusher = null;
+    let channel = null;
+
+    function setMeta(text) { document.getElementById("meta").innerText = text; }
+
+    function escapeHtml(str) {
+      return (str ?? "").replace(/[&<>"']/g, (m) => ({
+        "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+      }[m]));
+    }
+
+    function logLine(html) {
+      const div = document.getElementById("messages");
+      div.innerHTML += `<div>${html}</div>`;
+      div.scrollTop = div.scrollHeight;
+    }
+
+    function saveState() { localStorage.setItem("livechat_state", JSON.stringify(state)); }
+
+    function loadState() {
+      const raw = localStorage.getItem("livechat_state");
+      if (!raw) return false;
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.session_token && parsed.conversation_id) {
+          state = parsed;
+          return true;
+        }
+      } catch(e) {}
+      return false;
+    }
+
+    async function apiPost(path, body, headers={}) {
+      const res = await fetch(API_BASE + path, {
+        method: "POST",
+        headers: { "Content-Type":"application/json", ...headers },
+        body: JSON.stringify(body)
+      });
+      const txt = await res.text();
+      let data; try { data = JSON.parse(txt); } catch { data = txt; }
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${txt}`);
+      return data;
+    }
+
+    async function apiGet(path) {
+      const res = await fetch(API_BASE + path);
+      const data = await res.json();
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return data;
+    }
+
+    function connectPusher() {
+      if (pusher) {
+        try { pusher.disconnect(); } catch(e){}
+      }
+
+      Pusher.logToConsole = true;
+
+      pusher = new Pusher(PUSHER_KEY, {
+        cluster: PUSHER_CLUSTER,          // ✅ مهم: بدون این ارور می‌گیری
+        wsHost: WS_HOST,
+        wsPort: WS_PORT,
+        forceTLS: false,
+        enabledTransports: ["ws"],
+        authEndpoint: API_BASE + "/api/broadcasting/auth",
+        auth: {
+          headers: {
+            "X-Session-Token": state.session_token,
+            "Accept": "application/json"
+          }
+        }
+      });
+
+      // برای اینکه خودت ببینی وصل شد/نشد
+      pusher.connection.bind("connected", () => {
+        logLine(`<span class="muted">✅ WS connected: socket_id=${pusher.connection.socket_id}</span>`);
+      });
+      pusher.connection.bind("error", (err) => {
+        logLine(`<span style="color:red;">❌ WS error: ${escapeHtml(JSON.stringify(err))}</span>`);
+      });
+
+      const chName = `private-conversation.${state.conversation_id}`;
+      channel = pusher.subscribe(chName);
+
+      channel.bind("pusher:subscription_succeeded", () => {
+        logLine(`<span class="muted">✅ subscribed: ${chName}</span>`);
+      });
+
+      channel.bind("pusher:subscription_error", (e) => {
+        logLine(`<span style="color:red;">❌ subscription_error: ${escapeHtml(JSON.stringify(e))}</span>`);
+      });
+
+      channel.bind("message.sent", (data) => {
+        logLine(`<b>${data.sender_type}</b>: ${escapeHtml(data.body)}`);
+      });
+    }
+
+    async function loadLastMessages() {
+      const msgs = await apiGet(`/api/conversations/${state.conversation_id}/messages`);
+      document.getElementById("messages").innerHTML = "";
+      const arr = Array.isArray(msgs) ? msgs : (msgs.data ?? msgs.data?.data ?? []);
+      arr.forEach(m => logLine(`<b>${m.sender_type}</b>: ${escapeHtml(m.body)}`));
+    }
+
+    async function initAuto() {
+      if (loadState()) {
+        setMeta(`Restored: visitor_id=${state.visitor_id} | conversation_id=${state.conversation_id}`);
+        connectPusher();
+        await loadLastMessages();
+        return;
+      }
+
+      setMeta("Creating visitor session...");
+      const session = await apiPost("/api/visitor/session", {});
+      state.visitor_id = session.visitor_id;
+      state.session_id = session.session_id;
+      state.session_token = session.session_token;
+
+      setMeta("Creating conversation...");
+      const conv = await apiPost("/api/conversations", {
+        visitor_id: state.visitor_id,
+        session_id: state.session_id,
+        subject: "Auto Chat"
+      });
+      state.conversation_id = conv.id;
+
+      saveState();
+
+      setMeta(`Created: visitor_id=${state.visitor_id} | conversation_id=${state.conversation_id}`);
+      connectPusher();
+      await loadLastMessages();
+    }
+
+    async function sendMessage() {
+      const body = document.getElementById("messageInput").value.trim();
+      if (!body) return;
+      document.getElementById("messageInput").value = "";
+
+      await apiPost(`/api/conversations/${state.conversation_id}/messages`, {
+        sender_id: state.visitor_id,
+        body
+      });
+      // realtime خودش میاد
+    }
+
+    function resetAll() {
+      localStorage.removeItem("livechat_state");
+      location.reload();
+    }
+
+    initAuto().catch(err => {
+      setMeta("Init failed");
+      logLine(`<span style="color:red;">Init error: ${escapeHtml(String(err))}</span>`);
+    });
+  </script>
+</body>
+</html>

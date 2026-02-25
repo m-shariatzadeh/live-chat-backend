@@ -1,0 +1,20 @@
+[90m= [39m[34;4mApp\Models\Conversation[39;24m {#6058
+    [34mid[39m: [35m1[39m,
+    [34mvisitor_id[39m: [35m2[39m,
+    [34msession_id[39m: [35m1[39m,
+    [34mstatus[39m: "[32mactive[39m",
+    [34mpriority[39m: "[32mnormal[39m",
+    [34msubject[39m: "[32mTest Subject[39m",
+    [34mstarted_at[39m: "[32m2026-02-21 08:15:53[39m",
+    [34mfirst_response_at[39m: "[32m2026-02-21 08:16:11[39m",
+    [34mresolved_at[39m: [36mnull[39m,
+    [34mclosed_at[39m: [36mnull[39m,
+    [34mfirst_admin_id[39m: [35m1[39m,
+    [34mlast_message_at[39m: "[32m2026-02-21 08:16:11[39m",
+    [34mlast_message_id[39m: [35m2[39m,
+    [34mrating[39m: [36mnull[39m,
+    [34mfeedback[39m: [36mnull[39m,
+    [34mcreated_at[39m: "[32m2026-02-21 08:15:53[39m",
+    [34mupdated_at[39m: "[32m2026-02-21 08:16:11[39m",
+  }
+

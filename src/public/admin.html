@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Admin Panel</title>
+  <script src="https://js.pusher.com/8.4.0/pusher.min.js"></script>
+  <style>
+    body { font-family: sans-serif; display:flex; gap:16px; }
+    .col { width: 50%; }
+    #conversations { border:1px solid #ccc; padding:10px; height:520px; overflow:auto; }
+    #messages { border:1px solid #ccc; padding:10px; height:360px; overflow:auto; margin:10px 0; }
+    button { padding:6px 10px; cursor:pointer; margin-right:6px; }
+    input { padding:8px; }
+    .muted { color:#666; font-size:12px; }
+    .item { border-bottom:1px solid #eee; padding:8px 0; }
+  </style>
+</head>
+<body>
+  <div class="col">
+    <h2>Admin</h2>
+
+    <div class="muted">Admin Token:</div>
+    <input id="adminToken" value="supersecret123" style="width: 95%;" />
+
+    <div style="margin-top:10px;">
+      <button onclick="loadConversations()">Load Conversations</button>
+      <button onclick="loadConversations('waiting')">Waiting</button>
+      <button onclick="loadConversations('active')">Active</button>
+    </div>
+
+    <h3>Conversations</h3>
+    <div id="conversations"></div>
+  </div>
+
+  <div class="col">
+    <h3 id="currentTitle">No conversation selected</h3>
+
+    <div>
+      <button onclick="assign()">Assign</button>
+      <button onclick="resolve()">Resolve</button>
+      <button onclick="closeConv()">Close</button>
+      <button onclick="loadMessages()">Reload Messages</button>
+    </div>
+
+    <div id="messages"></div>
+
+    <input id="replyInput" placeholder="Reply..." style="width:70%;" />
+    <button onclick="sendReply()">Send</button>
+  </div>
+
+  <script>
+    const API_BASE = "http://localhost:8000";
+    const PUSHER_KEY = "appkey";
+    const PUSHER_CLUSTER = "mt1";   // ✅ مهم
+    const WS_HOST = "localhost";
+    const WS_PORT = 6001;
+
+    let currentConversationId = null;
+    let pusher = null;
+    let channel = null;
+
+    function escapeHtml(str) {
+      return (str ?? "").replace(/[&<>"']/g, (m) => ({
+        "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+      }[m]));
+    }
+
+    function logLine(html) {
+      const div = document.getElementById("messages");
+      div.innerHTML += `<div>${html}</div>`;
+      div.scrollTop = div.scrollHeight;
+    }
+
+    async function apiGet(path) {
+      const res = await fetch(API_BASE + path);
+      const data = await res.json();
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return data;
+    }
+
+    async function apiPost(path, body) {
+      const res = await fetch(API_BASE + path, {
+        method: "POST",
+        headers: { "Content-Type":"application/json" },
+        body: JSON.stringify(body)
+      });
+      const txt = await res.text();
+      let data; try { data = JSON.parse(txt); } catch { data = txt; }
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${txt}`);
+      return data;
+    }
+
+    function connectPusherAdmin() {
+      const adminToken = document.getElementById("adminToken").value;
+
+      if (pusher) {
+        try { pusher.disconnect(); } catch(e){}
+      }
+
+      Pusher.logToConsole = true;
+
+      pusher = new Pusher(PUSHER_KEY, {
+        cluster: PUSHER_CLUSTER,      // ✅ مهم
+        wsHost: WS_HOST,
+        wsPort: WS_PORT,
+        forceTLS: false,
+        enabledTransports: ["ws"],
+        authEndpoint: API_BASE + "/api/broadcasting/auth-admin",
+        auth: {
+          headers: {
+            "X-Admin-Token": adminToken,
+            "Accept": "application/json"
+          }
+        }
+      });
+
+      pusher.connection.bind("connected", () => {
+        logLine(`<span class="muted">✅ WS connected: socket_id=${pusher.connection.socket_id}</span>`);
+      });
+
+      const chName = `private-conversation.${currentConversationId}`;
+      channel = pusher.subscribe(chName);
+
+      channel.bind("pusher:subscription_succeeded", () => {
+        logLine(`<span class="muted">✅ subscribed: ${chName}</span>`);
+      });
+
+      channel.bind("pusher:subscription_error", (e) => {
+        logLine(`<span style="color:red;">❌ subscription_error: ${escapeHtml(JSON.stringify(e))}</span>`);
+      });
+
+      channel.bind("message.sent", (data) => {
+        logLine(`<b>${data.sender_type}</b>: ${escapeHtml(data.body)}`);
+      });
+    }
+
+    async function loadConversations(status=null) {
+      const url = status ? `/api/admin/conversations?status=${encodeURIComponent(status)}` : `/api/admin/conversations`;
+      const res = await apiGet(url);
+      const list = res.data ?? [];
+
+      const box = document.getElementById("conversations");
+      box.innerHTML = "";
+
+      list.forEach(conv => {
+        box.innerHTML += `
+          <div class="item">
+            <div><b>#${conv.id}</b> - ${conv.status} - visitor:${conv.visitor_id}</div>
+            <div class="muted">${escapeHtml(conv.subject || '')}</div>
+            <button onclick="selectConversation(${conv.id})">Open</button>
+          </div>
+        `;
+      });
+    }
+
+    async function selectConversation(id) {
+      currentConversationId = id;
+      document.getElementById("currentTitle").innerText = `Conversation #${id}`;
+      document.getElementById("messages").innerHTML = "";
+      connectPusherAdmin();
+      await loadMessages();
+    }
+
+    async function loadMessages() {
+      if (!currentConversationId) return;
+      const msgs = await apiGet(`/api/conversations/${currentConversationId}/messages`);
+      const arr = Array.isArray(msgs) ? msgs : (msgs.data ?? msgs.data?.data ?? []);
+      document.getElementById("messages").innerHTML = "";
+      arr.forEach(m => logLine(`<b>${m.sender_type}</b>: ${escapeHtml(m.body)}`));
+    }
+
+    async function sendReply() {
+      if (!currentConversationId) return;
+      const body = document.getElementById("replyInput").value.trim();
+      if (!body) return;
+      document.getElementById("replyInput").value = "";
+
+      await apiPost(`/api/admin/conversations/${currentConversationId}/messages`, {
+        admin_id: 1,
+        body
+      });
+    }
+
+    async function assign() {
+      if (!currentConversationId) return;
+      await apiPost(`/api/admin/conversations/${currentConversationId}/assign`, { admin_id: 1 });
+      await loadConversations();
+    }
+
+    async function resolve() {
+      if (!currentConversationId) return;
+      await apiPost(`/api/admin/conversations/${currentConversationId}/resolve`, {});
+      await loadConversations();
+    }
+
+    async function closeConv() {
+      if (!currentConversationId) return;
+      await apiPost(`/api/admin/conversations/${currentConversationId}/close`, {});
+      await loadConversations();
+    }
+
+    loadConversations().catch(console.error);
+    Pusher.log((msg) => {
+      console.log(msg)
+    })
+  </script>
+</body>
+</html>

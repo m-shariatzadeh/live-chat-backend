@@ -1,0 +1,454 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('visitors', function (Blueprint $table) {
+            $table->id();
+
+            $table->string('name')->nullable();
+            $table->string('email')->nullable()->index();
+            $table->string('phone')->nullable();
+
+            $table->unsignedBigInteger('user_id')->nullable()->index();
+
+            $table->string('ip', 45)->nullable();
+            $table->text('user_agent')->nullable();
+
+            $table->timestamp('last_seen_at')->nullable();
+
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('visitors');
+    }
+};
+===========================
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('visitor_sessions', function (Blueprint $table) {
+            $table->id();
+
+            $table->uuid('uuid')->unique();
+            $table->foreignId('visitor_id')->constrained()->cascadeOnDelete();
+
+            $table->string('session_token', 120)->unique();
+
+            $table->timestamp('started_at');
+            $table->timestamp('last_activity_at')->nullable();
+            $table->timestamp('ended_at')->nullable();
+
+            $table->text('entry_url')->nullable();
+            $table->text('entry_referrer')->nullable();
+            $table->text('last_url')->nullable();
+
+            $table->string('ip', 45)->nullable();
+            $table->text('user_agent')->nullable();
+
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('visitor_sessions');
+    }
+};
+===============================
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('departments', function (Blueprint $table) {
+            $table->id();
+
+            $table->string('name');
+            $table->integer('sla_response_minutes')->default(5);
+            $table->integer('sla_resolve_minutes')->default(60);
+
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('departments');
+    }
+};
+===========================
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('conversations', function (Blueprint $table) {
+            $table->id();
+
+            $table->foreignId('visitor_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('session_id')->constrained('visitor_sessions')->cascadeOnDelete();
+
+            $table->enum('status', ['waiting', 'active', 'resolved', 'closed'])
+                ->default('waiting')
+                ->index();
+
+            $table->enum('priority', ['low', 'normal', 'high', 'vip'])
+                ->default('normal')
+                ->index();
+
+            $table->string('subject')->nullable();
+
+            $table->timestamp('started_at')->nullable();
+            $table->timestamp('first_response_at')->nullable();
+            $table->timestamp('resolved_at')->nullable();
+            $table->timestamp('closed_at')->nullable();
+
+            $table->unsignedBigInteger('first_admin_id')->nullable();
+
+            $table->timestamp('last_message_at')->nullable();
+            $table->unsignedBigInteger('last_message_id')->nullable();
+
+            $table->tinyInteger('rating')->nullable();
+            $table->text('feedback')->nullable();
+
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('conversations');
+    }
+};
+===================================
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('conversation_assignments', function (Blueprint $table) {
+            $table->id();
+
+            $table->foreignId('conversation_id')
+                ->constrained()
+                ->cascadeOnDelete();
+
+            $table->unsignedBigInteger('agent_id')->index();
+
+            $table->unsignedBigInteger('assigned_by')->nullable();
+
+            $table->timestamp('assigned_at')->useCurrent();
+            $table->timestamp('unassigned_at')->nullable();
+
+            $table->boolean('is_primary')->default(true);
+
+            $table->timestamps();
+
+            $table->index(['conversation_id', 'agent_id']);
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('conversation_assignments');
+    }
+};
+=====================================
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('messages', function (Blueprint $table) {
+            $table->id();
+
+            $table->foreignId('conversation_id')
+                ->constrained()
+                ->cascadeOnDelete()
+                ->index();
+
+            $table->enum('sender_type', ['visitor', 'agent', 'system'])->index();
+            $table->unsignedBigInteger('sender_id')->nullable()->index();
+
+            $table->enum('type', ['text', 'file', 'image', 'voice', 'system'])
+                ->default('text');
+
+            $table->longText('body')->nullable();
+            $table->json('meta')->nullable();
+
+            $table->unsignedBigInteger('reply_to')->nullable();
+
+            $table->boolean('seen_by_visitor')->default(false)->index();
+            $table->boolean('seen_by_agent')->default(false)->index();
+
+            $table->timestamp('edited_at')->nullable();
+            $table->timestamp('deleted_at')->nullable();
+
+            $table->timestamps();
+
+            $table->index(['conversation_id', 'id']); // id-based pagination
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('messages');
+    }
+};
+===============================
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('message_attachments', function (Blueprint $table) {
+            $table->id();
+
+            $table->foreignId('message_id')
+                ->constrained()
+                ->cascadeOnDelete();
+
+            $table->string('file_name');
+            $table->string('file_type')->nullable();
+            $table->unsignedBigInteger('file_size')->nullable();
+
+            $table->string('path');
+            $table->string('thumbnail')->nullable();
+
+            $table->integer('duration')->nullable();
+            $table->integer('width')->nullable();
+            $table->integer('height')->nullable();
+
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('message_attachments');
+    }
+};
+===================================
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('agent_presence', function (Blueprint $table) {
+            $table->unsignedBigInteger('agent_id')->primary();
+
+            $table->boolean('is_online')->default(false);
+            $table->timestamp('last_seen_at')->nullable();
+
+            $table->string('last_socket_id')->nullable();
+
+            $table->unsignedBigInteger('current_conversation_id')->nullable();
+
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('agent_presence');
+    }
+};
+===================================
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('canned_responses', function (Blueprint $table) {
+            $table->id();
+
+            $table->string('title');
+            $table->text('body');
+
+            $table->string('shortcut')->nullable()->index();
+
+            $table->unsignedBigInteger('created_by');
+
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('canned_responses');
+    }
+};
+===================================
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('conversation_tags', function (Blueprint $table) {
+            $table->id();
+
+            $table->string('name');
+            $table->string('color', 20)->nullable();
+
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('conversation_tags');
+    }
+};
+==========================================
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('conversation_department', function (Blueprint $table) {
+
+            $table->foreignId('conversation_id')
+                ->constrained()
+                ->cascadeOnDelete();
+
+            $table->foreignId('department_id')
+                ->constrained()
+                ->cascadeOnDelete();
+
+            $table->primary(['conversation_id', 'department_id']);
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('conversation_department');
+    }
+};
+=======================================
