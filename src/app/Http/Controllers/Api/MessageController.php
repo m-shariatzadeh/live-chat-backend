@@ -53,9 +53,9 @@ class MessageController extends Controller
 
     public function delete(Message $message)
     {
-        broadcast(new MessageDelete($message))->toOthers();
+        broadcast(new MessageDelete($message->id,$message->conversation_id))->toOthers();
 
-        // $message->delete();
+        $message->delete();
 
         return response()->json($message);
     }

@@ -11,11 +11,11 @@ class MessageDelete implements ShouldBroadcast
 {
     use SerializesModels;
 
-    public function __construct(public Message $message) {}
+    public function __construct(public int $messageId, public int $conversationId) {}
 
     public function broadcastOn()
     {
-        return new PrivateChannel('conversation.' . $this->message->conversation_id);
+        return new PrivateChannel('conversation.' . $this->conversationId);
     }
 
     public function broadcastAs()
@@ -26,7 +26,7 @@ class MessageDelete implements ShouldBroadcast
     public function broadcastWith()
     {
         return [
-            'id' => $this->message->id,
+            'id' => $this->messageId,
         ];
     }
 }

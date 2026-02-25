@@ -51,7 +51,7 @@ services:
       - livechat
 
   soketi:
-    image: local/soketi:latest
+    image: quay.io/soketi/soketi:latest
     container_name: livechat_soketi
     environment:
       SOKETI_DEBUG: 1
@@ -62,6 +62,7 @@ services:
       - "6001:6001"
     networks:
       - livechat
+    command: ["--host", "0.0.0.0"]
 
   horizon:
     build:
