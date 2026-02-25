@@ -9,6 +9,23 @@ use Illuminate\Http\Request;
 
 class AdminMessageController extends Controller
 {
+    public function index(Request $request, Conversation $conversation)
+    {
+        $lastId = $request->query('last_id');
+
+        $query = $conversation->messages()
+            ->orderByDesc('id')
+            ->limit(20);
+
+        if ($lastId) {
+            $query->where('id', '<', $lastId);
+        }
+
+        $messages = $query->get()->reverse()->values();
+
+        return response()->json($messages);
+    }
+
     public function store(Request $request, Conversation $conversation, MessageService $service)
     {
         $data = $request->validate([

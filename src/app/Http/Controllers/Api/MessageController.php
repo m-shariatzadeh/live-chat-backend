@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Conversation;
+use App\Models\Message;
 use App\Services\MessageService;
 use App\Http\Requests\StoreMessageRequest;
 use Illuminate\Http\Request;
+use App\Events\MessageDelete;
 
 class MessageController extends Controller
 {
@@ -44,6 +46,16 @@ class MessageController extends Controller
             $visitorId,
             $request->body
         );
+
+
+        return response()->json($message);
+    }
+
+    public function delete(Message $message)
+    {
+        broadcast(new MessageDelete($message))->toOthers();
+
+        // $message->delete();
 
         return response()->json($message);
     }

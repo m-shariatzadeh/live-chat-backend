@@ -42,8 +42,8 @@ Route::middleware(['visitor.session', 'visitor.phone'])->group(function () {
     Route::post('/conversations', [ConversationController::class, 'store']);
     Route::get('/conversations/{conversation}', [ConversationController::class, 'show']);
     Route::get('/conversations/{conversation}/messages', [MessageController::class, 'index']);
-    Route::post('/conversations/{conversation}/messages', [MessageController::class, 'store'])
-        ->middleware('throttle:chat');
+    Route::post('/conversations/{conversation}/messages', [MessageController::class, 'store'])->middleware('throttle:chat');
+    Route::delete('/messages/{message}/delete', [MessageController::class, 'delete']);
 });
 
 // Admin/Auth
@@ -58,7 +58,8 @@ Route::prefix('admin')->group(function () {
         Route::post('/conversations/{conversation}/assign', [AdminConversationController::class, 'assign']);
         Route::post('/conversations/{conversation}/resolve', [AdminConversationController::class, 'resolve']);
         Route::post('/conversations/{conversation}/close', [AdminConversationController::class, 'close']);
-        Route::post('/conversations/{conversation}/messages', [\App\Http\Controllers\Api\AdminMessageController::class, 'store']);
+        Route::get('/conversations/{conversation}/messages', [AdminMessageController::class, 'index']);
+        Route::post('/conversations/{conversation}/messages', [AdminMessageController::class, 'store']);
     });
 });
 
