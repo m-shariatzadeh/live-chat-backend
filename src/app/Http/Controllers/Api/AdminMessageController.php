@@ -34,12 +34,14 @@ class AdminMessageController extends Controller
         $data = $request->validate([
             'admin_id' => ['required', 'integer'],
             'body' => ['required', 'string', 'max:4000'],
+            'reply_to' => ['nullable'],
         ]);
 
         $message = $service->sendAgentMessage(
             $conversation,
             $data['admin_id'],
-            $data['body']
+            $data['body'],
+            $data['reply_to'],
         );
 
         return response()->json($message);

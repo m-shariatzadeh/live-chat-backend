@@ -37,10 +37,11 @@ class MessageService
     public function sendAgentMessage(
         Conversation $conversation,
         int $agentId,
-        string $body
+        string $body,
+        int|null $reply_to
     ): Message {
 
-        $message = DB::transaction(function () use ($conversation, $agentId, $body) {
+        $message = DB::transaction(function () use ($conversation, $agentId, $body, $reply_to) {
 
             $message = Message::create([
                 'conversation_id' => $conversation->id,
@@ -48,6 +49,7 @@ class MessageService
                 'sender_id'       => $agentId,
                 'type'            => 'text',
                 'body'            => $body,
+                'reply_to'        => $reply_to,
             ]);
 
             // اگر اولین پاسخ Agent باشد
