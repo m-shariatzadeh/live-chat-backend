@@ -45,9 +45,9 @@ class MessageController extends Controller
         $message = $this->service->sendVisitorMessage(
             $conversation,
             $visitorId,
-            $request->body
+            $request->body,
+            $request->reply_to
         );
-
 
         return response()->json($message);
     }
@@ -57,7 +57,7 @@ class MessageController extends Controller
         $request->validate(['body' => 'required']);
 
         $message->update([
-            'body' => $request->body
+            'body' => $request->body,
         ]);
 
         broadcast(new MessageUpdate($message))->toOthers();
