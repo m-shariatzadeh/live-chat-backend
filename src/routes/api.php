@@ -44,6 +44,7 @@ Route::middleware(['visitor.session', 'visitor.phone'])->group(function () {
     Route::get('/conversations/{conversation}/messages', [MessageController::class, 'index']);
     Route::post('/conversations/{conversation}/messages', [MessageController::class, 'store'])->middleware('throttle:chat');
     Route::delete('/messages/{message}/delete', [MessageController::class, 'delete']);
+    Route::patch('/messages/{message}/update', [MessageController::class, 'update']);
 });
 
 // Admin/Auth
@@ -60,6 +61,8 @@ Route::prefix('admin')->group(function () {
         Route::post('/conversations/{conversation}/close', [AdminConversationController::class, 'close']);
         Route::get('/conversations/{conversation}/messages', [AdminMessageController::class, 'index']);
         Route::post('/conversations/{conversation}/messages', [AdminMessageController::class, 'store']);
+        Route::delete('/messages/{message}/delete', [AdminMessageController::class, 'delete']);
+        Route::patch('/messages/{message}/update', [AdminMessageController::class, 'update']);
     });
 });
 

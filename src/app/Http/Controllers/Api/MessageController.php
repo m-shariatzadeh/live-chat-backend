@@ -9,6 +9,7 @@ use App\Services\MessageService;
 use App\Http\Requests\StoreMessageRequest;
 use Illuminate\Http\Request;
 use App\Events\MessageDelete;
+use App\Events\MessageUpdate;
 
 class MessageController extends Controller
 {
@@ -51,12 +52,26 @@ class MessageController extends Controller
         return response()->json($message);
     }
 
-    public function delete(Message $message)
+    public function update(Request $request, Message $message)
     {
-        broadcast(new MessageDelete($message))->toOthers();
+        $request->validate(['body' => 'required']);
 
-        // $message->delete();
+        $message->update([
+            'body' => $request->body
+        ]);
+
+        broadcast(new MessageUpdate($message))->toOthers();
 
         return response()->json($message);
+    }
+
+    public function delete(Message $message)
+    {
+        $message_id = $message->id;
+        broadcast(new MessageDelete($message_id, $message->conversation_id))->toOthers();
+
+        $message->delete();
+
+        return response()->json($message_id);
     }
 }

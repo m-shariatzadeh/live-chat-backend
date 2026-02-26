@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Conversation;
+use App\Models\Message;
+use App\Events\MessageDelete;
+use App\Events\MessageUpdate;
 use App\Services\MessageService;
 use Illuminate\Http\Request;
 
@@ -40,5 +43,28 @@ class AdminMessageController extends Controller
         );
 
         return response()->json($message);
+    }
+
+    public function update(Request $request, Message $message)
+    {
+        $request->validate(['body' => 'required']);
+
+        $message->update([
+            'body' => $request->body
+        ]);
+
+        broadcast(new MessageUpdate($message))->toOthers();
+
+        return response()->json($message);
+    }
+
+    public function delete(Message $message)
+    {
+        $message_id = $message->id;
+        broadcast(new MessageDelete($message_id, $message->conversation_id))->toOthers();
+
+        $message->delete();
+
+        return response()->json($message_id);
     }
 }
