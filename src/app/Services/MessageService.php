@@ -12,16 +12,18 @@ class MessageService
     public function sendVisitorMessage(
         Conversation $conversation,
         int $visitorId,
-        string $body
+        string $body,
+        int|null $reply_to
     ): Message {
 
-        $message = DB::transaction(function () use ($conversation, $visitorId, $body) {
+        $message = DB::transaction(function () use ($conversation, $visitorId, $body, $reply_to) {
             $message = Message::create([
                 'conversation_id' => $conversation->id,
                 'sender_type'     => 'visitor',
                 'sender_id'       => $visitorId,
                 'type'            => 'text',
                 'body'            => $body,
+                'reply_to'        => $reply_to,
             ]);
 
             $this->updateConversationMeta($conversation, $message);

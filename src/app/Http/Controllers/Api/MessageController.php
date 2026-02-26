@@ -9,6 +9,7 @@ use App\Services\MessageService;
 use App\Http\Requests\StoreMessageRequest;
 use Illuminate\Http\Request;
 use App\Events\MessageDelete;
+use App\Events\MessageUpdate;
 
 class MessageController extends Controller
 {
@@ -44,19 +45,30 @@ class MessageController extends Controller
         $message = $this->service->sendVisitorMessage(
             $conversation,
             $visitorId,
-            $request->body
+            $request->body,
+            $request->reply_to
         );
 
+        return response()->json($message);
+    }
+
+    public function update(Request $request, Message $message)
+    {
+        $request->validate(['body' => 'required']);
+
+        $message->update([
+            'body' => $request->body,
+        ]);
+
+        broadcast(new MessageUpdate($message))->toOthers();
 
         return response()->json($message);
     }
 
     public function delete(Message $message)
     {
-        broadcast(new MessageDelete($message->id,$message->conversation_id))->toOthers();
-
-        $message->delete();
-
-        return response()->json($message);
+        $message_id = $message->id;
+        broadcast(new MessageDelete($message_id, $message->conversation_id))->toOthers();
+        return response()->json($message_id);
     }
 }

@@ -7,20 +7,20 @@ use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Queue\SerializesModels;
 
-class MessageSent implements ShouldBroadcast
+class MessageUpdate implements ShouldBroadcast
 {
     use SerializesModels;
 
     public function __construct(public Message $message) {}
 
-public function broadcastOn()
-{
-    return new PrivateChannel('conversation.' . $this->message->conversation_id);
-}
+    public function broadcastOn()
+    {
+        return new PrivateChannel('conversation.' . $this->message->conversation_id);
+    }
 
     public function broadcastAs()
     {
-        return 'message.sent';
+        return 'message.update';
     }
 
     public function broadcastWith()
@@ -31,7 +31,6 @@ public function broadcastOn()
             'sender_type' => $this->message->sender_type,
             'sender_id' => $this->message->sender_id,
             'body' => $this->message->body,
-            'reply_to' => $this->message->reply_to,
             'created_at' => $this->message->created_at?->toISOString(),
         ];
     }
