@@ -51,7 +51,7 @@ services:
       - livechat
 
   soketi:
-    image: quay.io/soketi/soketi:latest
+    image: local/soketi:latest
     container_name: livechat_soketi
     environment:
       SOKETI_DEBUG: 1
@@ -205,4 +205,5 @@ volumes:
 #   livechat:
 
 # volumes:
+
 #   mysql_data:
